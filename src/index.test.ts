@@ -12,6 +12,7 @@ function email(id: string, fields: Partial<Email> = {}): Email {
     html: null,
     text: null,
     verificationCode: null,
+    verificationLink: null,
     links: [],
     attachments: [],
     ...fields,
@@ -42,7 +43,16 @@ function fakeApi(arrivals: Email[][], responses: Response[] = [], apiKey?: strin
       return found ? Response.json(found) : Response.json({ error: "Email not found" }, { status: 404 });
     }
     listCalls++;
-    return Response.json({ emails: inbox.map(({ messageId, from, subject, receivedAt }) => ({ messageId, from, subject, receivedAt })) });
+    return Response.json({
+      emails: inbox.map(({ messageId, from, subject, receivedAt, verificationCode, verificationLink }) => ({
+        messageId,
+        from,
+        subject,
+        receivedAt,
+        verificationCode,
+        verificationLink,
+      })),
+    });
   };
   return {
     saci: new Saci({ baseUrl: "https://saci.cc/api", fetch: fetch as typeof globalThis.fetch, apiKey }),
@@ -121,6 +131,27 @@ describe("waitForLink", () => {
     const inbox = saci.inbox(ADDRESS);
     expect(await inbox.waitForLink({ match: "/confirm" })).toBe("https://app.com/confirm?token=abc");
     expect(await inbox.waitForLink()).toBe("https://app.com/logo.png");
+  });
+
+  it("prefers the link to confirm or sign in, straight from the list", async () => {
+    const links = ["https://app.com/logo.png", "https://app.com/confirm?token=abc"];
+    const { saci, requests } = fakeApi([[email("m1", { links, verificationLink: "https://app.com/confirm?token=abc" })]]);
+    expect(await saci.inbox(ADDRESS).waitForLink()).toBe("https://app.com/confirm?token=abc");
+    expect(requests.some((r) => r.url.pathname.endsWith("/emails/m1"))).toBe(false);
+  });
+
+  it("opens the email when the verification link doesn't match", async () => {
+    const links = ["https://app.com/confirm?token=abc", "https://app.com/reset?token=def"];
+    const { saci } = fakeApi([[email("m1", { links, verificationLink: "https://app.com/confirm?token=abc" })]]);
+    expect(await saci.inbox(ADDRESS).waitForLink({ match: "/reset" })).toBe("https://app.com/reset?token=def");
+  });
+});
+
+describe("waitForCode from the list", () => {
+  it("doesn't open the email when the list has the code", async () => {
+    const { saci, requests } = fakeApi([[email("m1", { verificationCode: "482913" })]]);
+    expect(await saci.inbox(ADDRESS).waitForCode()).toBe("482913");
+    expect(requests.some((r) => r.url.pathname.endsWith("/emails/m1"))).toBe(false);
   });
 });
 

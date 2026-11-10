@@ -13,6 +13,10 @@ export interface EmailSummary {
   from: string;
   subject: string;
   receivedAt?: string;
+  /** The verification code, found by the API when the email arrived */
+  verificationCode?: string | null;
+  /** The link to confirm the address or sign in, found by the API when the email arrived */
+  verificationLink?: string | null;
 }
 
 export interface Attachment {
@@ -31,6 +35,8 @@ export interface Email extends EmailSummary {
   text: string | null;
   /** The verification code found in the subject or body, if any */
   verificationCode: string | null;
+  /** The link to click to confirm the address, sign in (magic link), activate the account or reset the password, if any */
+  verificationLink: string | null;
   links: string[];
   attachments: Attachment[];
 }
@@ -59,7 +65,10 @@ export interface WaitOptions {
 }
 
 export interface WaitForLinkOptions extends WaitOptions {
-  /** Only links that contain this text or match this pattern. Without it, the first link. */
+  /**
+   * Only links that contain this text or match this pattern. Without it, the link to confirm
+   * the address or sign in, or else the first link.
+   */
   match?: string | RegExp;
 }
 
@@ -169,21 +178,34 @@ export class Inbox {
 
   /** Waits for an email with a verification code and returns the code, e.g. "482913" */
   waitForCode(options: WaitOptions = {}): Promise<string> {
-    return this.waitFor(options, (email) => email.verificationCode, "verification code");
+    return this.waitFor(options, (email) => email.verificationCode, "verification code", (summary) => summary.verificationCode);
   }
 
-  /** Waits for an email with a link (matching `match`, if given) and returns the link */
+  /**
+   * Waits for an email with a link and returns it: the one matching `match`, if given,
+   * otherwise the link to confirm the address or sign in, or else the first link
+   */
   waitForLink(options: WaitForLinkOptions = {}): Promise<string> {
+    const { match } = options;
+    const verification = (email: EmailSummary) =>
+      email.verificationLink && matches(email.verificationLink, match) ? email.verificationLink : null;
     return this.waitFor(
       options,
-      (email) => email.links.find((link) => matches(link, options.match)) ?? null,
-      options.match === undefined ? "link" : `link matching ${options.match}`,
+      (email) => verification(email) ?? email.links.find((link) => matches(link, match)) ?? null,
+      match === undefined ? "link" : `link matching ${match}`,
+      verification,
     );
   }
 
   // Long-polls the inbox until `pick` finds something in an email that passes the filters.
-  // Each email is opened at most once; newer emails are checked first.
-  private async waitFor<T>(options: WaitOptions, pick: (email: Email) => T | null, what: string): Promise<T> {
+  // Each email is opened at most once; newer emails are checked first. The list already has
+  // the code and link the API found, so `fromSummary` can answer without opening the email.
+  private async waitFor<T>(
+    options: WaitOptions,
+    pick: (email: Email) => T | null,
+    what: string,
+    fromSummary?: (summary: EmailSummary) => T | null | undefined,
+  ): Promise<T> {
     const deadline = Date.now() + (options.timeout ?? DEFAULT_TIMEOUT_MS);
     const after = options.after === undefined ? NaN : new Date(options.after).getTime();
     const checked = new Set<string>();
@@ -201,7 +223,7 @@ export class Inbox {
         checked.add(summary.messageId);
         if (!Number.isNaN(after) && !(timeOf(summary.receivedAt) > after)) continue;
         if (!matches(summary.from, options.from) || !matches(summary.subject, options.subject)) continue;
-        const found = pick(await this.get(summary.messageId));
+        const found = fromSummary?.(summary) ?? pick(await this.get(summary.messageId));
         if (found !== null && found !== undefined) return found;
       }
 

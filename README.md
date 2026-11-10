@@ -23,6 +23,8 @@ console.log(inbox.address); // a1b2c3d4e5f60718@saci.cc
 // ...sign up with inbox.address...
 
 const code = await inbox.waitForCode(); // "482913"
+// or, when the email has a button instead of a code:
+const link = await inbox.waitForLink(); // "https://your-app.com/verify?token=..."
 ```
 
 ## Playwright
@@ -123,7 +125,7 @@ Wait for an email and return its verification code, a link in it, or the whole e
 | `subject` | Only emails whose subject contains this text (case-insensitive) or matches a RegExp |
 | `after`   | Only emails received after this `Date` or ISO string                            |
 | `timeout` | Milliseconds to wait. Default `60000`                                           |
-| `match`   | `waitForLink` only: the link must contain this text or match a RegExp. Without it, the first link |
+| `match`   | `waitForLink` only: the link must contain this text or match a RegExp. Without it, the link to confirm the address or sign in (see `verificationLink`), or else the first link |
 
 An email looks like this:
 
@@ -136,7 +138,9 @@ An email looks like this:
   html: "<p>Your code is <b>482913</b></p>",
   text: "Your code is 482913",
   verificationCode: "482913", // or null
-  links: ["https://github.com/settings/emails"],
+  // The link to confirm the address, sign in, activate the account or reset the password, or null
+  verificationLink: "https://github.com/users/confirm_verification/7f3e...",
+  links: ["https://github.com/users/confirm_verification/7f3e...", "https://github.com/settings/emails"],
   attachments: [{ index: 0, filename: "invoice.pdf", contentType: "application/pdf", size: 48213, inline: false, url: "https://..." }],
 }
 ```
@@ -144,7 +148,7 @@ An email looks like this:
 ### Other methods
 
 - `inbox.address`: the email address (`String(inbox)` gives the same).
-- `inbox.list()`: summaries of the emails in the inbox, newest first.
+- `inbox.list()`: summaries of the emails in the inbox, newest first, with `verificationCode` and `verificationLink`.
 - `inbox.get(messageId)`: one email in full.
 - `inbox.delete(messageId)` and `inbox.clear()`: delete one email or all of them.
 - `new Saci().inbox(address)`: an `Inbox` for an address created earlier.
