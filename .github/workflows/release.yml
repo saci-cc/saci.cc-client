@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Run the release again by hand, e.g. after a failed npm publish
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -28,7 +30,7 @@ jobs:
   release:
     name: Release
     needs: test
-    if: github.event_name == 'push'
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
