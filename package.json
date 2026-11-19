@@ -15,7 +15,7 @@
   "homepage": "https://saci.cc/en/docs/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rfoel/saci.cc-client.git"
+    "url": "git+https://github.com/saci-cc/saci.cc-client.git"
   },
   "license": "MIT",
   "type": "module",
