@@ -184,6 +184,18 @@ describe("errors", () => {
     expect(requests[0].url.pathname).toBe(requests[1].url.pathname);
   });
 
+  it("doesn't retry a 402 and keeps its details", async () => {
+    const spent = Response.json(
+      { error: "This account created its 1,000 inboxes for this month", limit: 1000, resetsAt: "2026-12-01T00:00:00.000Z", upgrade: true },
+      { status: 402 },
+    );
+    const { saci, requests } = fakeApi([[]], [spent]);
+    const error = await saci.createInbox().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(SaciError);
+    expect(error).toMatchObject({ status: 402, body: { limit: 1000, resetsAt: "2026-12-01T00:00:00.000Z", upgrade: true } });
+    expect(requests).toHaveLength(1);
+  });
+
   it("throws the API error with its status", async () => {
     const { saci } = fakeApi([[]]);
     const error = await saci

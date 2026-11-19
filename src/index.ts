@@ -72,10 +72,24 @@ export interface WaitForLinkOptions extends WaitOptions {
   match?: string | RegExp;
 }
 
+/** What the API answered with an error: always `error`, plus details for some statuses */
+export interface SaciErrorBody {
+  error: string;
+  /** 402: the free plan's monthly inboxes */
+  limit?: number;
+  /** 402: when the monthly count starts over (ISO date) */
+  resetsAt?: string;
+  /** 402: a paid plan lifts the limit (https://saci.cc/pricing/) */
+  upgrade?: boolean;
+  [key: string]: unknown;
+}
+
 export class SaciError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** The API's JSON answer, when there was one */
+    readonly body: SaciErrorBody | null = null,
   ) {
     super(message);
     this.name = "SaciError";
@@ -135,8 +149,9 @@ export class Saci {
         continue;
       }
       if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new SaciError(`${method} ${path} failed with ${res.status}: ${body?.error ?? res.statusText}`, res.status);
+        // 402 (the free plan's monthly inboxes) isn't retried: it lasts until the month turns
+        const body = (await res.json().catch(() => null)) as SaciErrorBody | null;
+        throw new SaciError(`${method} ${path} failed with ${res.status}: ${body?.error ?? res.statusText}`, res.status, body);
       }
       return (res.status === 204 ? undefined : await res.json()) as T;
     }

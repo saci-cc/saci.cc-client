@@ -113,7 +113,7 @@ it("signs up with a verification code", () => {
 
 ### `createInbox(options?)`
 
-Creates an inbox and returns an `Inbox`. Without `name` the address is random (16 hex characters). With `name: "signup-test"` you get `signup-test@saci.cc`. Either way the inbox belongs to your API key's account for 7 days: only that account can read it, and nobody else can create the same name (a `SaciError` with status 409).
+Creates an inbox and returns an `Inbox`. Without `name` the address is random (16 hex characters). With `name: "signup-test"` you get `signup-test@saci.cc`. Either way the inbox belongs to your API key's account for 7 days (30 on Pro, 90 on Team): only that account can read it, and nobody else can create the same name (a `SaciError` with status 409).
 
 ### `inbox.waitForCode(options?)`, `inbox.waitForLink(options?)`, `inbox.waitForEmail(options?)`
 
@@ -155,14 +155,29 @@ An email looks like this:
 - `new Saci({ apiKey })`: pass the key instead of using `SACI_API_KEY`.
 - `new Saci({ baseUrl, fetch })`: point at another deployment or pass your own `fetch`.
 
-Failed requests throw `SaciError`, which has the HTTP `status`. A missing or revoked key gives a 401.
+Failed requests throw `SaciError`, with the HTTP `status` and the API's JSON answer in `body`. A missing or revoked key gives a 401. On the Free plan, a 402 means the account created its 1,000 inboxes for the month: `body.resetsAt` says when the count starts over, and it isn't retried.
+
+```ts
+import { SaciError } from "saci.cc";
+
+try {
+  await saci.createInbox();
+} catch (error) {
+  if (error instanceof SaciError && error.status === 402) {
+    console.log(`Out of inboxes until ${error.body?.resetsAt}`);
+  }
+  throw error;
+}
+```
 
 ## Limits
 
-- 120 requests per minute per API key's account. The client waits and retries when it gets a 429.
+- Requests per minute per account, across its keys: 120 on Free, 600 on Pro, 2,000 on Team. The client waits and retries when it gets a 429.
+- Inboxes created with your keys: 1,000 a month on Free, no cap on Pro and Team. Past that, `createInbox` throws a `SaciError` with status 402.
 - Emails are deleted about a day after they arrive.
-- Inboxes created with your key are private to your account for 7 days. Still, it's a service for tests and sign-ups: don't use it for anything sensitive.
-- Want to be told instead of waiting? Set a webhook on [saci.cc/en/account](https://saci.cc/en/account/) and each email is POSTed to your URL ([format](https://saci.cc/en/docs/#webhooks)).
+- Inboxes created with your key are private to your account for 7 days (30 on Pro, 90 on Team). Still, it's a service for tests and sign-ups: don't use it for anything sensitive.
+- Want to be told instead of waiting? On Pro and Team, set a webhook on [saci.cc/en/account](https://saci.cc/en/account/) and each email is POSTed to your URL ([format](https://saci.cc/en/docs/#webhooks)).
+- Plans and prices: [saci.cc/en/pricing](https://saci.cc/en/pricing/).
 - Addresses only receive email.
 
 The full HTTP API is documented at [saci.cc/en/docs](https://saci.cc/en/docs/). There's also an [MCP server](https://saci.cc/en/mcp/) for AI agents.
