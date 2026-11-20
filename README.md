@@ -182,6 +182,13 @@ try {
 
 The full HTTP API is documented at [saci.cc/en/docs](https://saci.cc/en/docs/). There's also an [MCP server](https://saci.cc/en/mcp/) for AI agents.
 
+## Guides
+
+- [Test email verification in Playwright](https://saci.cc/en/blog/playwright-email-verification/)
+- [Test password reset end to end](https://saci.cc/en/blog/password-reset-tests/)
+- [Email tests in GitHub Actions: secrets, shards and limits](https://saci.cc/en/blog/github-actions-email-tests/)
+- [Email verification in Selenium and Puppeteer](https://saci.cc/en/blog/selenium-puppeteer-email/)
+
 ## Development
 
 ```bash
